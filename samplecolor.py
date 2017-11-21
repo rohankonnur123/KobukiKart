@@ -4,6 +4,7 @@
 import Adafruit_TCS34725
 import smbus
 import time
+import math
 
 tcs = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1)
 
@@ -32,8 +33,11 @@ while True:
         g_sum += _g
         b_sum += _b
         time.sleep(0.3)
+      r_avg = r_sum // 5
+      g_avg = g_sum // 5
+      b_avg = g_sum // 5
       # Input average to mapping
-      color_mappings[color] = [r_sum//5, g_sum//5, b_sum//5]
+      color_mappings[color] = math.sqrt((r_avg * r_avg) + (g_avg * g_avg) + (b_avg * b_avg))
     else:
       break
 
@@ -42,7 +46,25 @@ if color_mappings:
   print("[color]: [r], [g], [b]")
   for color in color_mappings.keys():
     rgb = color_mappings[color]
-    print("{0}: {1}, {2}, {3}".format(color, str(rgb[0]), str(rgb[1]), str(rgb[2])))
+    print("{0}: {1}".format(color, str(rgb)))
+
+def is_color(color):
+  r, g, b, _ = tcs.get_raw_data()
+  test = math.sqrt((r*r) + (g*g) + (b*b))
+  rgb = color_mappings[color]
+  return rgb - 2 < test and test < rgb + 2
+
+while True:
+  try:
+    r, g, b, _ = tcs.get_raw_data()
+  except KeyboardInterrupt:
+    test = str(raw_input("Want to test for a color? (Hit Enter to exit): "))
+    if test:
+      for color in color_mappings:
+        if is_color(color):
+          print("detected {0} ".format(color))
+    else:
+      break
 
 # Enable interrupts and put the chip back to low power sleep/disabled.
 tcs.set_interrupt(True)
