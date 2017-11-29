@@ -1,0 +1,10 @@
+[Unit]
+Description=Power-off gpu
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/vgaoff
+
+[Install]
+WantedBy=multi-user.target
+
