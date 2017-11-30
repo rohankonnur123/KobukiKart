@@ -1,12 +1,91 @@
 #!/usr/bin/python
 
 import Adafruit_BBIO.UART as UART
+import Adafruit_TCS34725
+import smbus
+import math
 import serial
 import time
 import array
 import struct
 import random
-import cwiid 
+import cwiid
+
+COLOR_FILE = "color_mappings.txt"
+
+def read_colors():
+    """
+    Reads colors from COLOR_FILE
+    File is formatted in color/magnitude pairs, separated by commas
+    Returns dictionary of color/magnitude pairs
+    """
+    color_mappings = {}
+    _file = open(COLOR_FILE, "r")
+    colors = _file.read()
+    colors.split(",")
+    for i in range(len(colors)/2)
+        color_mappings[colors[2*i]] = colors[2*i + 1]
+    _file.close()
+    return color_mappings
+
+def write_colors(color_mappings):
+    """
+    Writes existing colors to COLOR_FILE
+    """
+    _file = open(COLOR_FILE, "w")
+    for color in color_mappings:
+        _file.write("{0},{1},".format(color, color_mappings[color]))
+
+def calibrate(tcs):
+    """
+    Checks for existing color mappings file and asks user to re-calibrate or not
+    Takes in a color sensor object and begins reading values
+    On Ctrl+C, prompts for a color name
+        - if name entered, stores reference color 'magnitude' to COLOR_MAPPINGS
+        - else, writes existing color mappings and exits calibration
+    Returns dictionary of color/magnitude pairs
+    """
+    color_mappings = {}
+    try:
+        color_mappings = read_colors()
+        # Able to read from file, prompt for overwrite
+        redo = str(raw_input("Read colors from file, re-calibrate? (y/n): "))
+        if redo == "y" or redo == "Y":
+            color_mappings = {}
+        else:
+            return color_mappings
+    except IOError:
+        print("No previous calibration to use, entering calibration")
+
+    while True:
+        try:
+            # Read the R, G, B, C color data.
+            r, g, b, _ = tcs.get_raw_data()
+
+            # Print out the values.
+            print("red={0} green={1} blue={2}".format(r, g, b))
+            time.sleep(0.5)
+        except KeyboardInterrupt:
+            color = str(raw_input("Enter color name (or Enter to exit): "))
+            if color:
+                # Average the next 5 data points
+                r_sum, g_sum, b_sum, _ = 0, 0, 0, 0
+                print("sampling {0} color. . .".format(color))
+                for i in range(5):
+                    _r, _g, _b, _ = tcs.get_raw_data()
+                    r_sum += _r
+                    g_sum += _g
+                    b_sum += _b
+                    time.sleep(0.3)
+                r_avg = r_sum / 5
+                g_avg = g_sum / 5
+                b_avg = g_sum / 5
+                # Input average to mapping
+                color_mappings[color] = \
+                    math.sqrt((r_avg*r_avg) + (g_avg*g_avg) + (b_avg*b_avg))
+            else:
+                break
+    write_colors(color_mappings)
 
 def checkSum(data, length):
 	cs = 0x00
