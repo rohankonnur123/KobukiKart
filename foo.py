@@ -86,6 +86,7 @@ def calibrate(tcs):
             else:
                 break
     write_colors(color_mappings)
+    return color_mappings
 
 def checkSum(data, length):
 	cs = 0x00
