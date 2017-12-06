@@ -1,12 +1,15 @@
 #!/usr/bin/python
 
 import Adafruit_BBIO.UART as UART
+import Adafruit_TCS34725
 import serial
 import time
 import array
 import struct
 import random
 import cwiid 
+import smbus
+import math
 
 def checkSum(data, length):
 	cs = 0x00
@@ -84,9 +87,19 @@ def toByteArray(data):
 	return byteData
 
 def isBanana():
-	return False #random.choice([True, False])
+	r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+	# if detect a yellow tape
+	if ((r > 23) and (g < 20) and (b < 10)):
+		print("isBanana: " + str(True))
+		return True
+	return False
 
 def isMushroom():
+	r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+	# if detect a blue tape
+	if ((r < 10) and (g > 10) and (b > 13)):
+		print("isMushroom: " + str(True))
+		return True
 	return False
 
 def userInputDirection():
@@ -137,6 +150,12 @@ def main():
 	while True:
 		if ser.isOpen():
 			print "Serial is open!"
+			print "Color sensor reading: "
+			r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+			print "red: " + str(r)
+			print "green: " + str(g)
+			print "blue: " + str(b)
+			print "RBG: " + str(math.sqrt((r*r)+(g*g)+(b*b)))	
 			bananaSequence = isBanana()
 			print bananaSequence
 			if bananaSequence:
