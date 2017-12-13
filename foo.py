@@ -10,8 +10,60 @@ import array
 import struct
 import random
 import cwiid
+import smbus
+import Adafruit_I2C as I2C
 
 COLOR_FILE = "color_mappings.txt"
+
+TCA9548A_ADDRESS = 0x70
+TCS34725_ADDRESS = 0x29
+CONTROL_ADDRESS = 0x04
+
+device = I2C.Adafruit_I2C(TCA9548A_ADDRESS, 1, True)
+
+def tca_select(i):
+	# Try writing an 8-bit select number
+	device.write8(CONTROL_ADDRESS, 1<<i)
+
+def read_light_sensor():
+	# Two color sensors attached to mux port 2 and 6
+	#right sensor
+	tca_select(3)
+	tcs3 = Adafruit_TCS34725.TCS34725(address=TCS34725_ADDRESS, busnum=1)
+	#left sensor
+	tca_select(5)
+	tcs5 = Adafruit_TCS34725.TCS34725(address=TCS34725_ADDRESS, busnum=1)
+	#middle sensor
+	tca_select(7)
+	tcs7 = Adafruit_TCS34725.TCS34725(address=TCS34725_ADDRESS, busnum=1)
+
+	color_array = []
+
+	# Read from first sensor
+	tca_select(3)
+	r1, g1, b1, _ = tcs3.get_raw_data()
+	color_array.append((r1,g1,b1))
+
+	print("I2C PORT 3 - R: {0}, G: {1}, B: {2}".format(r1, g1, b1))
+	# time.sleep(0.5)
+
+	# Read from second sensor
+	tca_select(5)
+	r2, g2, b2, _ = tcs5.get_raw_data()
+	color_array.append((r2,g2,b2))
+
+	print("I2C PORT 5 - R: {0}, G: {1}, B: {2}".format(r2, g2, b2))
+	# time.sleep(0.5)
+
+	# Read from second sensor
+	tca_select(7)
+	r3, g3, b3, _ = tcs7.get_raw_data()
+	color_array.append((r3,g3,b3))
+
+	print("I2C PORT 7 - R: {0}, G: {1}, B: {2}".format(r3, g3, b3))
+	# time.sleep(0.5)
+
+	return color_array
 
 def read_colors():
     """
@@ -23,7 +75,7 @@ def read_colors():
     _file = open(COLOR_FILE, "r")
     colors = _file.read()
     colors.split(",")
-    for i in range(len(colors)/2)
+    for i in range(len(colors)/2):
         color_mappings[colors[2*i]] = colors[2*i + 1]
     _file.close()
     return color_mappings
@@ -35,58 +87,6 @@ def write_colors(color_mappings):
     _file = open(COLOR_FILE, "w")
     for color in color_mappings:
         _file.write("{0},{1},".format(color, color_mappings[color]))
-
-def calibrate(tcs):
-    """
-    Checks for existing color mappings file and asks user to re-calibrate or not
-    Takes in a color sensor object and begins reading values
-    On Ctrl+C, prompts for a color name
-        - if name entered, stores reference color 'magnitude' to COLOR_MAPPINGS
-        - else, writes existing color mappings and exits calibration
-    Returns dictionary of color/magnitude pairs
-    """
-    color_mappings = {}
-    try:
-        color_mappings = read_colors()
-        # Able to read from file, prompt for overwrite
-        redo = str(raw_input("Read colors from file, re-calibrate? (y/n): "))
-        if redo == "y" or redo == "Y":
-            color_mappings = {}
-        else:
-            return color_mappings
-    except IOError:
-        print("No previous calibration to use, entering calibration")
-
-    while True:
-        try:
-            # Read the R, G, B, C color data.
-            r, g, b, _ = tcs.get_raw_data()
-
-            # Print out the values.
-            print("red={0} green={1} blue={2}".format(r, g, b))
-            time.sleep(0.5)
-        except KeyboardInterrupt:
-            color = str(raw_input("Enter color name (or Enter to exit): "))
-            if color:
-                # Average the next 5 data points
-                r_sum, g_sum, b_sum, _ = 0, 0, 0, 0
-                print("sampling {0} color. . .".format(color))
-                for i in range(5):
-                    _r, _g, _b, _ = tcs.get_raw_data()
-                    r_sum += _r
-                    g_sum += _g
-                    b_sum += _b
-                    time.sleep(0.3)
-                r_avg = r_sum / 5
-                g_avg = g_sum / 5
-                b_avg = g_sum / 5
-                # Input average to mapping
-                color_mappings[color] = \
-                    math.sqrt((r_avg*r_avg) + (g_avg*g_avg) + (b_avg*b_avg))
-            else:
-                break
-    write_colors(color_mappings)
-    return color_mappings
 
 def checkSum(data, length):
 	cs = 0x00
@@ -163,20 +163,36 @@ def toByteArray(data):
 	byteData = array.array('B',data).tostring()
 	return byteData
 
-def isBanana():
-	r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+def isBanana(colorsRead):
+	# r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
 	# if detect a yellow tape
-	if ((r > 23) and (g < 20) and (b < 10)):
-		print("isBanana: " + str(True))
-		return True
+	for sensor in colorsRead:
+		r,g,b = sensor[0],sensor[1],sensor[2]
+		if ((27 < r and r < 35) and (g < 25) and (10 < b and b < 15)):
+			print("isBanana: " + str(True))
+			return True
 	return False
 
-def isMushroom():
-	r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+def isMushroom(colorsRead):
+	# r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
 	# if detect a blue tape
-	if ((r < 10) and (g > 10) and (b > 13)):
-		print("isMushroom: " + str(True))
-		return True
+	for sensor in colorsRead:
+		r,g,b = sensor[0],sensor[1],sensor[2]
+		print("DIFFERENT MUSHROOM VALUES" + str(sensor))
+		if ((r <= 10) and (g > 10) and (b > 13)):
+			print("MUSHROOM VALUES" + str(sensor))
+			print("isMushroom: " + str(True))
+			return True
+	return False
+
+def isBorder(colorsRead):
+	# r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+	#if detects a green tape
+	for sensor in colorsRead:
+		r,g,b = sensor[0],sensor[1],sensor[2]
+		if ((r >= 27) and (g < 15) and (b < 10)):
+			print("isBorder: " + str(True))
+			return True
 	return False
 
 def userInputDirection():
@@ -224,48 +240,81 @@ def main():
 	#turn on led to show connected 
 	wm.led = 1
 
+	numBananas = 1
+	bananaTimestamp = 0
+	mushroomSpeedupStart = 0
+	maxSpeed = 200
+
 	while True:
 		if ser.isOpen():
-			print "Serial is open!"
-			print "Color sensor reading: "
-			r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
-			print "red: " + str(r)
-			print "green: " + str(g)
-			print "blue: " + str(b)
-			print "RBG: " + str(math.sqrt((r*r)+(g*g)+(b*b)))
-			bananaSequence = isBanana()
+
+			# print "Serial is open!"
+			# print "Color sensor reading: "
+			# r, g, b, _ = Adafruit_TCS34725.TCS34725(address=0x29, busnum=1).get_raw_data()
+			# print "red: " + str(r)
+			# print "green: " + str(g)
+			# print "blue: " + str(b)
+			# print "RBG: " + str(math.sqrt((r*r)+(g*g)+(b*b)))
+			if (mushroomSpeedupStart !=0) and ((time.time() - mushroomSpeedupStart) > 10):
+				maxSpeed = 200
+				mushroomSpeedupStart = 0
+			colorsRead = read_light_sensor()
+
+			bananaSequence = isBanana(colorsRead)
 			print bananaSequence
-			if bananaSequence:
+			if bananaSequence and ((time.time() - bananaTimestamp)>30):
 				start = time.time()
+				numBananas = 0
+				bananaTimestamp = time.time()
 				while (time.time() - start) < 10:
 					print time.time() - start
 					print (time.time()- start) < 10
-					turnRightData = kobukiDriveSpeeds(100,50)
+					wm.rumble = True
+					turnRightData = kobukiDriveSpeeds(200,-200)
 					ser.write(toByteArray(turnRightData))
-			mushroomSequence = isMushroom()
+					time.sleep(0.1)
+				wm.rumble = False
+
+			mushroomSequence = isMushroom(colorsRead)
 			print mushroomSequence
 			if mushroomSequence:
+				mushroomSpeedupStart = time.time()
+				maxSpeed = 300
+				# start = time.time()
+				# while (time.time() - start) < 10:
+				# 	print time.time() - start
+				# 	speedUpData = kobukiDriveSpeeds(250, 250)
+				# 	ser.write(toByteArray(speedUpData))
+				# 	time.sleep(0.1)
+
+			borderSequence = isBorder(colorsRead)
+			print borderSequence
+			if borderSequence:
 				start = time.time()
-				while (time.time() - start) < 10:
+				while (time.time() - start) < 2:
 					print time.time() - start
-					speedUpData = kobukiDriveSpeeds(250, 250)
-					ser.write(toByteArray(speedUpData))
+					wm.rumble = True
+					reverseData = kobukiDriveSpeeds(-200, -200)
+					ser.write(toByteArray(reverseData))
+					time.sleep(0.1)
+				wm.rumble = False
+
 			else:
 				#normalRunning
-				userData = kobukiDriveSpeeds(150,150)
+				userData = kobukiDriveSpeeds(maxSpeed,maxSpeed)
 				if wm.state['buttons'] == 8:
 					#forward
 					turn_angle = (3.6 * wm.state['acc'][1]) - 360
 					print turn_angle
 					if turn_angle < 86:
-						userData = kobukiDriveSpeeds(150-turn_angle,150)
+						userData = kobukiDriveSpeeds(maxSpeed-turn_angle,maxSpeed)
 					elif turn_angle > 104:
-						userData = kobukiDriveSpeeds(150,150-(180-turn_angle))
+						userData = kobukiDriveSpeeds(maxSpeed,maxSpeed-(180-turn_angle))
 					else:
-						userData = kobukiDriveSpeeds(150,150)
+						userData = kobukiDriveSpeeds(maxSpeed,maxSpeed)
 				elif wm.state['buttons'] == 4:
 					#backwards
-					userData = kobukiDriveSpeeds(-150,-150)
+					userData = kobukiDriveSpeeds(-1*maxSpeed,-1*maxSpeed)
 				else:
 					userData = kobukiDriveSpeeds(0,0)
 					#do nothing
@@ -277,3 +326,6 @@ def main():
 
 if __name__=="__main__":
 	main()
+
+
+
