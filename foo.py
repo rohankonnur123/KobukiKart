@@ -168,7 +168,7 @@ def isBanana(colorsRead):
 	# if detect a yellow tape
 	for sensor in colorsRead:
 		r,g,b = sensor[0],sensor[1],sensor[2]
-		if ((27 < r and r < 35) and (g < 25) and (10 < b and b < 15)):
+		if ((27 < r and r < 38) and (g < 25) and (10 < b and b < 15)):
 			print("isBanana: " + str(True))
 			return True
 	return False
@@ -179,7 +179,7 @@ def isMushroom(colorsRead):
 	for sensor in colorsRead:
 		r,g,b = sensor[0],sensor[1],sensor[2]
 		print("DIFFERENT MUSHROOM VALUES" + str(sensor))
-		if ((r <= 10) and (g > 10) and (b > 13)):
+		if ((r <= 10) and (12 > g and g > 9) and (20 > b and b > 13)):
 			print("MUSHROOM VALUES" + str(sensor))
 			print("isMushroom: " + str(True))
 			return True
@@ -190,7 +190,7 @@ def isBorder(colorsRead):
 	#if detects a green tape
 	for sensor in colorsRead:
 		r,g,b = sensor[0],sensor[1],sensor[2]
-		if ((r >= 27) and (g < 15) and (b < 10)):
+		if ((r >= 27) and (g < 15) and (8 < b and b < 12)):
 			print("isBorder: " + str(True))
 			return True
 	return False
